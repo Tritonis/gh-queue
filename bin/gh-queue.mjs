@@ -10,7 +10,7 @@
 // compact, jq-free output: JSON is parsed in Node rather than shelled
 // through `-q`.
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from '../lib/parse-args.mjs';
 import { loadFileConfig, resolveConfig } from '../lib/config.mjs';
@@ -74,7 +74,12 @@ export function main(argv, run, cwd = process.cwd()) {
   return command === 'help' || command === '--help' || command === undefined ? 0 : 2;
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// `npm link` installs this file behind a symlink, and Node resolves
+// import.meta.url to the real path while process.argv[1] stays the link —
+// comparing the two directly made the globally installed `gh-queue` do
+// nothing at all and exit 0. Both sides are realpath'd before comparing.
+const isMain =
+  process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   const ghPath = resolveGh();
   if (!ghPath) {
