@@ -33,7 +33,7 @@ gh-queue view <n>                        one issue: body and last comments
 gh-queue park <n> "<text>" [--keyboard]  ready -> blocked, with a comment saying why
 gh-queue unpark <n>                      blocked -> ready
 gh-queue note "<text>"                   comment on the state issue
-gh-queue milestone "<name-or-prefix>"              open issues in a milestone, plus a true count
+gh-queue milestone <name-or-prefix>      open issues in a milestone, plus a true count
 gh-queue close-batch --issues 1,2,3 --note "<text>" [--dry-run]
 gh-queue init [--force] [--dry-run]      write .gh-queue.json, create the labels
 gh-queue help
