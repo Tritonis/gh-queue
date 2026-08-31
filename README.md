@@ -39,6 +39,9 @@ gh-queue init [--force] [--dry-run]      write .gh-queue.json, create the labels
 gh-queue help
 ```
 
+A bare `gh-queue` (or one that starts with a flag, e.g. `gh-queue --lines 5`)
+is `triage` — it is the session-start call, so it is the default.
+
 Display flags: `--lines N` (triage, view), `--comments K` (view).
 
 `milestone` exists because GitHub's own milestone `open_issues` counter
@@ -62,7 +65,8 @@ Three settings: `stateIssue`, `readyLabel`, `blockedPrefix` (plus an optional
 
 1. CLI flag — `--state-issue N`, `--ready-label L`, `--blocked-prefix P`, `--repo OWNER/NAME`
 2. environment — `GH_QUEUE_STATE_ISSUE`, `GH_QUEUE_READY_LABEL`, `GH_QUEUE_BLOCKED_PREFIX`, `GH_QUEUE_REPO`
-3. `.gh-queue.json` in the current directory
+3. the nearest `.gh-queue.json` in the current directory or any ancestor (so a
+   session whose cwd is a subdirectory of the repo still finds the repo's config)
 4. built-in defaults — `stateIssue` **0**, `readyLabel` `ready`, `blockedPrefix` `blocked:user`
 
 `stateIssue: 0` means "no state issue configured": `triage` simply skips that

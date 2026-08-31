@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadFileConfig, resolveConfig } from '../lib/config.mjs';
@@ -56,5 +56,21 @@ test('loadFileConfig: absent file is silent; malformed is one warning, not a sil
     assert.ok(bad.errs[0].startsWith('ignoring .gh-queue.json: '));
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadFileConfig: the config is found from a subdirectory by walking up, nearest wins', () => {
+  const root = mkdtempSync(join(tmpdir(), 'gh-queue-test-'));
+  try {
+    const deep = join(root, 'a', 'b', 'c');
+    mkdirSync(deep, { recursive: true });
+    writeFileSync(join(root, '.gh-queue.json'), '{"stateIssue": 38}', 'utf8');
+    assert.equal(loadFileConfig(deep).stateIssue, 38, 'a session cwd three levels down still sees the repo config');
+
+    writeFileSync(join(root, 'a', '.gh-queue.json'), '{"stateIssue": 7}', 'utf8');
+    assert.equal(loadFileConfig(deep).stateIssue, 7, 'the nearest ancestor wins over a farther one');
+    assert.equal(loadFileConfig(root).stateIssue, 38, 'walking up never descends');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

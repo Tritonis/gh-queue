@@ -6,14 +6,27 @@ import { join } from 'node:path';
 import { main, resolveGh } from '../bin/gh-queue.mjs';
 import { capture, recorder } from './helpers.mjs';
 
-test('main: help and a bare invocation print the usage listing every command', () => {
-  for (const argv of [['help'], ['--help'], []]) {
+test('main: help prints the usage listing every command', () => {
+  for (const argv of [['help'], ['--help']]) {
     const { rc, out } = capture(() => main(argv, recorder(() => ({ status: 0, stdout: '[]', stderr: '' }))));
-    assert.equal(rc, 0, `${argv[0] ?? '(none)'} exits 0`);
+    assert.equal(rc, 0, `${argv[0]} exits 0`);
     for (const cmd of ['triage', 'view', 'park', 'unpark', 'note', 'milestone', 'close-batch', 'init']) {
       assert.ok(out.includes(cmd), `usage mentions ${cmd}`);
     }
   }
+});
+
+test('main: a bare invocation, or one starting with a flag, is triage', () => {
+  for (const argv of [[], ['--lines', '5'], ['--repo=o/n']]) {
+    const run = recorder(() => ({ status: 0, stdout: '[]', stderr: '' }));
+    const { rc, out } = capture(() => main(argv, run, tmpdir()));
+    assert.equal(rc, 0, `${JSON.stringify(argv)} exits 0`);
+    assert.ok(out.includes('READY (ready)'), `${JSON.stringify(argv)} produced a triage, not usage`);
+    assert.ok(run.calls.length > 0, 'gh was actually called');
+  }
+  const flagged = recorder(() => ({ status: 0, stdout: '[]', stderr: '' }));
+  capture(() => main(['--repo=o/n'], flagged, tmpdir()));
+  assert.deepEqual(flagged.calls[0].slice(0, 2), ['-R', 'o/n'], 'the leading flag is honoured by the implied triage');
 });
 
 test('main: an unknown command prints usage and exits 2', () => {

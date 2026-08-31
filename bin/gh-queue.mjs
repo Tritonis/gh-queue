@@ -55,7 +55,11 @@ export function makeRun(ghPath) {
 }
 
 export function main(argv, run, cwd = process.cwd()) {
-  const [command, ...rest] = argv;
+  // Bare `gh-queue` is the session-start ritual, so it means `triage`; a
+  // leading flag (`gh-queue --repo x`) is triage with that flag.
+  const [command, ...rest] = argv.length === 0 || argv[0].startsWith('--') && argv[0] !== '--help'
+    ? ['triage', ...argv]
+    : argv;
   const fileCfg = loadFileConfig(cwd);
   const flags = parseArgs(rest);
   const cfg = resolveConfig(flags, fileCfg);
@@ -71,7 +75,7 @@ export function main(argv, run, cwd = process.cwd()) {
   if (command === 'close-batch') return cmdCloseBatch(run, cfg, flags);
 
   console.log(USAGE);
-  return command === 'help' || command === '--help' || command === undefined ? 0 : 2;
+  return command === 'help' || command === '--help' ? 0 : 2;
 }
 
 // `npm link` installs this file behind a symlink, and Node resolves
