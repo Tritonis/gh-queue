@@ -33,7 +33,7 @@ gh-queue view <n>                        one issue: body and last comments
 gh-queue park <n> "<text>" [--keyboard]  ready -> blocked, with a comment saying why
 gh-queue unpark <n>                      blocked -> ready
 gh-queue note "<text>"                   comment on the state issue
-gh-queue milestone "<name>"              open issues in a milestone, plus a true count
+gh-queue milestone "<name-or-prefix>"              open issues in a milestone, plus a true count
 gh-queue close-batch --issues 1,2,3 --note "<text>" [--dry-run]
 gh-queue init [--force] [--dry-run]      write .gh-queue.json, create the labels
 gh-queue help
@@ -48,6 +48,12 @@ Display flags: `--lines N` (triage, view), `--comments K` (view).
 drifts — it lags issue transfers and some API-side closes, so a milestone can
 show a nonzero count with nothing actually open in it. The `N open` line here
 is derived by listing the issues, never read off the milestone object.
+
+The `<name-or-prefix>` argument doesn't have to be the exact title: an exact
+match wins outright, otherwise it's resolved as a case-insensitive prefix
+against all milestones. A prefix matching more than one title exits 2 as
+ambiguous; a prefix matching none exits 2 as no match — either way the
+candidate titles are printed and no issue list is fetched.
 
 `close-batch` verifies every close with a re-fetch: an issue that comes back
 `OPEN`, or one whose verification call fails, counts as a failure and the

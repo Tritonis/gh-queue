@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { capLines, bucketBlocked, formatView, formatIssueRow } from '../lib/format.mjs';
+import { capLines, bucketBlocked, formatView, formatIssueRow, parseMilestones, resolveMilestone } from '../lib/format.mjs';
 
 test('capLines: truncation marker appears only when over the cap', () => {
   assert.equal(capLines('a\nb\nc', 5), 'a\nb\nc');
@@ -49,4 +49,46 @@ test('formatView: header with and without milestone; last-k comment selection', 
   );
   assert.ok(withoutMilestone.startsWith('#7 Other — CLOSED — labels: '));
   assert.ok(!withoutMilestone.includes('milestone:'));
+});
+
+// --- parseMilestones --------------------------------------------------
+
+test('parseMilestones: parses a single JSON array', () => {
+  const out = parseMilestones('[{"title":"a"},{"title":"b"}]');
+  assert.deepEqual(out.map((m) => m.title), ['a', 'b']);
+});
+
+test('parseMilestones: handles two concatenated pages from --paginate', () => {
+  const out = parseMilestones('[{"title":"a"}][{"title":"b"}]');
+  assert.deepEqual(out.map((m) => m.title), ['a', 'b']);
+});
+
+test('parseMilestones: empty stdout is an empty list', () => {
+  assert.deepEqual(parseMilestones(''), []);
+});
+
+// --- resolveMilestone ---------------------------------------------------
+
+test('resolveMilestone: exact title wins even with a prefix collision', () => {
+  const milestones = [{ title: 'M0' }, { title: 'M0 - Project foundations' }];
+  assert.deepEqual(resolveMilestone('M0', milestones), { title: 'M0' });
+});
+
+test('resolveMilestone: unambiguous case-insensitive prefix resolves', () => {
+  const milestones = [{ title: 'M0 - Project foundations' }, { title: 'M1 - Data pipeline' }];
+  assert.deepEqual(resolveMilestone('m0', milestones), { title: 'M0 - Project foundations' });
+});
+
+test('resolveMilestone: multiple prefix matches is ambiguous', () => {
+  const milestones = [{ title: 'M0 - Project foundations' }, { title: 'M1 - Data pipeline' }];
+  const r = resolveMilestone('M', milestones);
+  assert.equal(r.error, 'ambiguous');
+  assert.deepEqual(r.candidates, ['M0 - Project foundations', 'M1 - Data pipeline']);
+});
+
+test('resolveMilestone: no matches returns all titles as candidates', () => {
+  const milestones = [{ title: 'M0 - Project foundations' }, { title: 'M1 - Data pipeline' }];
+  const r = resolveMilestone('Zzz', milestones);
+  assert.equal(r.error, 'none');
+  assert.deepEqual(r.candidates, ['M0 - Project foundations', 'M1 - Data pipeline']);
 });

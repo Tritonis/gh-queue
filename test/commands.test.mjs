@@ -212,27 +212,32 @@ test('note: no text is a usage error', () => {
 
 // --- milestone ------------------------------------------------------------
 
+const MS = (titles) => OK(JSON.stringify(titles.map((title) => ({ title, state: 'open', number: 1 }))));
+
 test('milestone: lists open issues and derives the count itself', () => {
-  const run = recorder(() =>
-    OK(JSON.stringify([
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['Batch 5']);
+    return OK(JSON.stringify([
       { number: 1, title: 'One', labels: [{ name: 'ready' }] },
       { number: 2, title: 'Two', labels: [] },
-    ])),
-  );
+    ]));
+  });
   const { rc, logs } = capture(() => cmdMilestone(run, CFG, ['Batch 5']));
   assert.equal(rc, 0);
-  assert.deepEqual(run.calls[0], [
+  assert.deepEqual(run.calls[0], ['api', 'repos/{owner}/{repo}/milestones?state=all&per_page=100', '--paginate']);
+  assert.deepEqual(run.calls[1], [
     'issue', 'list', '--milestone', 'Batch 5', '--state', 'open', '--json', 'number,title,labels', '--limit', '200',
   ]);
   assert.deepEqual(logs, ['#1  One  [ready]', '#2  Two', '2 open']);
 });
 
 test('milestone: an empty milestone still prints an explicit count', () => {
-  const { logs } = capture(() => cmdMilestone(recorder(() => OK('[]')), CFG, ['Batch 6']));
+  const run = recorder((args) => (args[0] === 'api' ? MS(['Batch 6']) : OK('[]')));
+  const { logs } = capture(() => cmdMilestone(run, CFG, ['Batch 6']));
   assert.deepEqual(logs, ['0 open']);
 });
 
-test('milestone: a gh failure is non-zero and prints no count', () => {
+test('milestone: a gh api failure is non-zero and prints no count', () => {
   const { rc, logs, errs } = capture(() => cmdMilestone(recorder(() => FAIL('gh: unknown milestone')), CFG, ['Nope']));
   assert.equal(rc, 1);
   assert.deepEqual(logs, [], 'a failure must not read as "0 open"');
@@ -243,6 +248,67 @@ test('milestone: no name is a usage error', () => {
   const run = recorder(() => OK());
   assert.equal(capture(() => cmdMilestone(run, CFG, [])).rc, 2);
   assert.equal(run.calls.length, 0);
+});
+
+test('milestone: exact title used verbatim, no header line', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['M0 — Project foundations', 'M1 — Data pipeline']);
+    return OK('[]');
+  });
+  const { logs } = capture(() => cmdMilestone(run, CFG, ['M0 — Project foundations']));
+  assert.deepEqual(logs, ['0 open']);
+  assert.deepEqual(run.calls[1].slice(0, 3), ['issue', 'list', '--milestone']);
+  assert.equal(run.calls[1][3], 'M0 — Project foundations');
+});
+
+test('milestone: unambiguous prefix resolves and prints a header line', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['M0 — Project foundations', 'M1 — Data pipeline']);
+    return OK('[]');
+  });
+  const { logs } = capture(() => cmdMilestone(run, CFG, ['M0']));
+  assert.equal(logs[0], 'milestone: M0 — Project foundations');
+  assert.equal(run.calls[1][3], 'M0 — Project foundations');
+});
+
+test('milestone: ambiguous prefix exits 2 and names both candidates, no issue list', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['M0 — Project foundations', 'M1 — Data pipeline']);
+    return OK('[]');
+  });
+  const { rc, logs } = capture(() => cmdMilestone(run, CFG, ['M']));
+  assert.equal(rc, 2);
+  assert.equal(logs[0], 'milestone "M": ambiguous — matches: M0 — Project foundations | M1 — Data pipeline');
+  assert.ok(!run.calls.some((c) => c[0] === 'issue'));
+});
+
+test('milestone: no match exits 2 and lists all titles, no issue list', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['M0 — Project foundations', 'M1 — Data pipeline']);
+    return OK('[]');
+  });
+  const { rc, logs } = capture(() => cmdMilestone(run, CFG, ['Zzz']));
+  assert.equal(rc, 2);
+  assert.equal(logs[0], 'milestone "Zzz": no match — milestones: M0 — Project foundations | M1 — Data pipeline');
+  assert.ok(!run.calls.some((c) => c[0] === 'issue'));
+});
+
+test('milestone: cfg.repo set uses the owner/name api path', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['Batch 5']);
+    return OK('[]');
+  });
+  capture(() => cmdMilestone(run, { ...CFG, repo: 'o/n' }, ['Batch 5']));
+  assert.equal(run.calls[0][1], 'repos/o/n/milestones?state=all&per_page=100');
+});
+
+test('milestone: cfg.repo unset uses the {owner}/{repo} placeholder path', () => {
+  const run = recorder((args) => {
+    if (args[0] === 'api') return MS(['Batch 5']);
+    return OK('[]');
+  });
+  capture(() => cmdMilestone(run, CFG, ['Batch 5']));
+  assert.equal(run.calls[0][1], 'repos/{owner}/{repo}/milestones?state=all&per_page=100');
 });
 
 // --- init -----------------------------------------------------------------
